@@ -13,8 +13,8 @@ def parse_arguments():
     p = argparse.ArgumentParser(description='Hyperparams')
     p.add_argument('-batchs', type=int, default=500000,
                    help='number of epochs for train')
-    p.add_argument('-critic_iter', type=int, default=5,
-                   help='critic iter')
+    p.add_argument('-critic_iters', type=int, default=5,
+                   help='critic iterations')
     p.add_argument('-batch_size', type=int, default=8,
                    help='number of epochs for train')
     p.add_argument('-seq_len', type=int, default=32,
@@ -113,6 +113,7 @@ def main():
           % (len(train_iter), len(train_iter.dataset),
              len(test_iter), len(test_iter.dataset), vocab_size))
 
+    # instantiate models
     G = Generator(dim=512, seq_len=args.seq_len, vocab_size=vocab_size)
     D = Discriminator(dim=512, seq_len=args.seq_len, vocab_size=vocab_size)
     optim_G = optim.Adam(G.parameters(), lr=args.lr, betas=(0.5, 0.9))
@@ -131,7 +132,7 @@ def main():
         # (1) Update D network
         for p in D.parameters():  # reset requires_grad
             p.requires_grad = True
-        for iter_d in range(10):  # CRITIC_ITERS
+        for iter_d in range(args.critic_iters):  # CRITIC_ITERS
             batch = next(train_iter)
             text, label = batch.text, batch.label
             text = to_onehot(text, vocab_size)
@@ -145,12 +146,12 @@ def main():
             p.requires_grad = False  # to avoid computation
         g_loss = train_generator(D, G, optim_G, batch_size, use_cuda)
 
-        if b % 1 == 0 and b > 1:
+        if b % 500 == 0 and b > 1:
             samples = sample(G, TEXT, 1, args.seq_len, vocab_size, use_cuda)
-            print("D:%5.2f G:%5.2f W:%5.2f \nsample:%s" %
+            print("D:%5.2f G:%5.2f W:%5.2f \nsample:%s \t [%d]" %
                   (d_loss.data[0], g_loss.data[0], wasserstein.data[0],
-                   samples[0]))
-        if b % 1000 == 0 and b > 1:
+                   samples[0], label.data[0]))
+        if b % 5000 == 0 and b > 1:
             print("[!] saving model")
             if not os.path.isdir(".save"):
                 os.makedirs(".save")
