@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from torch.autograd import Variable
 
 
@@ -23,3 +24,24 @@ def sample(G, TEXT, batch_size, seq_len, vocab_size, use_cuda=True):
         decoded = "".join([TEXT.vocab.itos[s] for s in argmax[i]])
         decoded_samples.append(decoded)
     return decoded_samples
+
+
+def plot(title, vis, x, y, win=None):
+    if win is None:
+        win = vis.line(
+            X=np.asarray([x]),
+            Y=np.asarray([y]),
+            opts=dict(title=title, xlabel='Batch', ylabel='Loss')
+        )
+    else:
+        vis.line(X=np.asarray([x]), Y=np.asarray([y]),
+                 win=win, update='append')
+    return win
+
+
+def log_sample(title, vis, text, win=None):
+    if win is None:
+        win = vis.text(text, opts=dict(title=title))
+    else:
+        vis.text(text, win=win, append=True)
+    return win

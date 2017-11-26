@@ -6,7 +6,8 @@ from torch import optim
 from torchtext.data import Field, BucketIterator
 from torchtext.datasets import IMDB
 from model import Generator, Discriminator
-from utils import to_onehot, sample
+from visdom import Visdom
+from utils import to_onehot, sample, plot, log_sample
 
 
 def parse_arguments():
@@ -17,13 +18,11 @@ def parse_arguments():
                    help='critic iterations')
     p.add_argument('-batch_size', type=int, default=8,
                    help='number of epochs for train')
-    p.add_argument('-seq_len', type=int, default=32,
+    p.add_argument('-seq_len', type=int, default=280,
                    help='sequence length')
     p.add_argument('-lamb', type=int, default=10,
                    help='lambda')
-    p.add_argument('-lr', type=float, default=0.00001,
-                   help='initial learning rate')
-    p.add_argument('-grad_clip', type=float, default=0.25,
+    p.add_argument('-lr', type=float, default=1e-4,
                    help='initial learning rate')
     return p.parse_args()
 
@@ -99,6 +98,12 @@ def main():
     args = parse_arguments()
     use_cuda = torch.cuda.is_available()
 
+    # visdom for plotting
+    vis = Visdom()
+    win_g, win_d, win_w = None, None, None
+    assert vis.check_connection()
+
+    # load datasets
     print("[!] preparing dataset...")
     TEXT = Field(lower=True, fix_length=args.seq_len,
                  tokenize=list, batch_first=True)
@@ -146,11 +151,20 @@ def main():
             p.requires_grad = False  # to avoid computation
         g_loss = train_generator(D, G, optim_G, batch_size, use_cuda)
 
+        # plot losses on visdom
+        win_d = plot('Discriminator Loss', vis,
+                     x=b, y=d_loss.data[0], win=win_d)
+        win_g = plot('Generator Loss', vis,
+                     x=b, y=g_loss.data[0], win=win_g)
+        win_w = plot('Wasserstein Distance', vis,
+                     x=b, y=wasserstein.data[0], win=win_w)
+
         if b % 500 == 0 and b > 1:
             samples = sample(G, TEXT, 1, args.seq_len, vocab_size, use_cuda)
-            print("D:%5.2f G:%5.2f W:%5.2f \nsample:%s \t [%d]" %
-                  (d_loss.data[0], g_loss.data[0], wasserstein.data[0],
+            print("[%d] D:%5.2f G:%5.2f W:%5.2f \nsample:%s \t [%d]" %
+                  (b, d_loss.data[0], g_loss.data[0], wasserstein.data[0],
                    samples[0], label.data[0]))
+            log_sample("Sample %d" % b, vis, samples)
         if b % 5000 == 0 and b > 1:
             print("[!] saving model")
             if not os.path.isdir(".save"):
